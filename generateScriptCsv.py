@@ -4,13 +4,25 @@ from contextlib import closing
 import csv
 from pydub import AudioSegment
 
-# set your credentials in your environment variables.
+# 環境変数からAWSの認証情報を取得
 aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
 aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
 aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
 region_name = os.environ.get('AWS_REGION', 'ap-northeast-1') 
 
 def synthesize_speech(text, output_file, voice_id='Tomoko', engine='neural'):
+    """
+    テキストを音声に変換し、指定されたファイルに保存する関数
+    
+    引数:
+        text (str): 音声に変換するテキスト
+        output_file (str): 出力先のファイルパス
+        voice_id (str): 使用する音声ID（デフォルト: 'Tomoko'）
+        engine (str): 使用するエンジンタイプ（デフォルト: 'neural'）
+    
+    戻り値:
+        なし
+    """
     polly_client = boto3.Session(
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
@@ -29,6 +41,15 @@ def synthesize_speech(text, output_file, voice_id='Tomoko', engine='neural'):
             file.write(stream.read())
 
 def load_conversation(file_path):
+    """
+    CSVファイルから会話データを読み込む関数
+    
+    引数:
+        file_path (str): 読み込むCSVファイルのパス
+    
+    戻り値:
+        list: (話者, テキスト)のタプルのリスト
+    """
     conversation = []
     with open(file_path, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
@@ -37,37 +58,39 @@ def load_conversation(file_path):
                 conversation.append(tuple(row))
     return conversation
 
-# Conversaion file.
+# 会話ファイルの指定
 conversation_file = 'conversation.csv' 
 conversation = load_conversation(conversation_file)
 
-# Tmp audios.
+# 一時的な音声ファイルを保存するディレクトリ
 temp_dir = "temp_audio_csv"
 os.makedirs(temp_dir, exist_ok=True)
 
-# Combined conversation file.
+# 結合した会話用の空のオーディオセグメントを作成
 combined_audio = AudioSegment.empty()
 
-# Genrate and combine.
+# 各会話を音声に変換して結合する
 for i, (speaker, text) in enumerate(conversation):
+    # 話者に応じて音声IDを選択（医師ならTakumi、それ以外はTomoko）
     voice_id = 'Takumi' if speaker == "医師" else 'Tomoko'
     output_file = os.path.join(temp_dir, f"{speaker}_{i+1}.mp3")
     synthesize_speech(text, output_file, voice_id)
     print(f"Generated: {output_file}")
     
+    # 音声ファイルを読み込んで結合
     audio_segment = AudioSegment.from_mp3(output_file)
     combined_audio += audio_segment
     
-    # Put an interval.
+    # 会話の間に無音区間を挿入（500ミリ秒）
     combined_audio += AudioSegment.silent(duration=500)
 
-# Output combined file.
+# 結合した音声ファイルを出力
 combined_output = "combined_conversation_csv.mp3"
 combined_audio.export(combined_output, format="mp3")
 
 print(f"Combined audio saved as: {combined_output}")
 
-# Clean up.
+# 一時ファイルの削除
 for file in os.listdir(temp_dir):
     os.remove(os.path.join(temp_dir, file))
 os.rmdir(temp_dir)
