@@ -1,6 +1,8 @@
 # Generate Conversation Audio
 This repository is a code for genrerating conversation audio file using Amaozon Poly.
 
+[日本語版README](README.ja.md)
+
 ### Prerequieties
 - Python 3.XX
 - boto3 SDK
